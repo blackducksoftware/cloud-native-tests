@@ -19,10 +19,10 @@ import (
 // TestGinkgo TODO
 func TestGinkgo(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Controller Manager Test Suite")
+	RunSpecs(t, "Synopsys Operator - Operator Manager Test Suite")
 }
 
-var _ = Describe("Operator Manager Tests", func() {
+var _ = Describe("Synopsys Operator Manager Tests", func() {
 
 	defer GinkgoRecover()
 
