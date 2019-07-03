@@ -34,6 +34,8 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // GetKubeConfig  will return the kube config
@@ -112,4 +114,18 @@ func GetKubeClient(kubeConfig *rest.Config) (*kubernetes.Clientset, error) {
 func IntToInt64Ptr(i int) *int64 {
 	j := int64(i)
 	return &j
+}
+
+// IsRetryableAPIError CHANGE
+func IsRetryableAPIError(err error) bool {
+	// These errors may indicate a transient error that we can retry in tests.
+	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
+		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
+		return true
+	}
+	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
+	if _, shouldRetry := apierrs.SuggestsClientDelay(err); shouldRetry {
+		return true
+	}
+	return false
 }

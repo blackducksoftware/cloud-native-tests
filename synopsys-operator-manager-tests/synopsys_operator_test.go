@@ -37,7 +37,7 @@ var _ = Describe("Synopsys Operator Manager Tests", func() {
 
 	mySynopsysCtl := utils.NewSynopsysctl("synopsysctl")
 
-	Context("operator in namespace scope", func() {
+	Describe("operator in namespace scope", func() {
 
 		Context("creating alert in alert namespace", func() {
 			// setup
