@@ -6,12 +6,11 @@ import (
 	"fmt"
 	"time"
 
+	k8sutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper"
 	"github.com/sirupsen/logrus"
 	v1 "k8s.io/api/core/v1"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/labels"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/apimachinery/pkg/util/wait"
 	clientset "k8s.io/client-go/kubernetes"
 )
@@ -71,7 +70,7 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 			if err != nil {
 				// e2elog.Logf("Failed to list pods: %v", err)
 				fmt.Printf("Failed to list pods: %v", err)
-				if IsRetryableAPIError(err) {
+				if k8sutils.IsRetryableAPIError(err) {
 					return false, nil
 				}
 				return false, err
@@ -98,7 +97,7 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 		options := metav1.ListOptions{LabelSelector: label.String()}
 		pods, err = c.CoreV1().Pods(ns).List(options)
 		if err != nil {
-			if IsRetryableAPIError(err) {
+			if k8sutils.IsRetryableAPIError(err) {
 				continue
 			}
 			return
@@ -111,20 +110,6 @@ func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selecto
 		err = fmt.Errorf("Timeout while waiting for pods with label %v", label)
 	}
 	return
-}
-
-// IsRetryableAPIError CHANGE
-func IsRetryableAPIError(err error) bool {
-	// These errors may indicate a transient error that we can retry in tests.
-	if apierrs.IsInternalError(err) || apierrs.IsTimeout(err) || apierrs.IsServerTimeout(err) ||
-		apierrs.IsTooManyRequests(err) || utilnet.IsProbableEOF(err) || utilnet.IsConnectionReset(err) {
-		return true
-	}
-	// If the error sends the Retry-After header, we respect it as an explicit confirmation we should retry.
-	if _, shouldRetry := apierrs.SuggestsClientDelay(err); shouldRetry {
-		return true
-	}
-	return false
 }
 
 // PodRunningReady checks whether pod p's phase is running and it has a ready
