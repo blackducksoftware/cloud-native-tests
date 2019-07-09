@@ -91,6 +91,28 @@ func WaitForPodsWithLabelRunningReady(c clientset.Interface, ns string, label la
 	return pods, err
 }
 
+// WaitForPodsWithLabelDeleted waits up to podListTimeout for pods with certain label to not exist
+// NOTE: Modified WaitForPodsWithLabel below
+func WaitForPodsWithLabelDeleted(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
+	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {
+		options := metav1.ListOptions{LabelSelector: label.String()}
+		pods, err = c.CoreV1().Pods(ns).List(options)
+		if err != nil {
+			if k8sutils.IsRetryableAPIError(err) {
+				continue
+			}
+			return
+		}
+		if len(pods.Items) == 0 {
+			break
+		}
+	}
+	if pods == nil || len(pods.Items) > 0 {
+		err = fmt.Errorf("Timeout while waiting for pods with label %v", label)
+	}
+	return
+}
+
 // WaitForPodsWithLabel waits up to podListTimeout for getting pods with certain label
 func WaitForPodsWithLabel(c clientset.Interface, ns string, label labels.Selector) (pods *v1.PodList, err error) {
 	for t := time.Now(); time.Since(t) < podListTimeout; time.Sleep(poll) {

@@ -10,6 +10,7 @@ import (
 	k8sutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper"
 	crdutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/crd"
 	podutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/pod"
+	namespaceutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/namespace"
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
@@ -52,19 +53,19 @@ var _ = Describe("synopsysctl", func() {
 
 	Describe("deploy command", func() {
 
-		Context("deploying the operator in cluster scope", func() {
+		Context("deploying Synopsys Operator in cluster scope", func() {
 
 			Specify("all crds can be enabled", func() {
-				// Setup
+				// BEGIN SETUP
 				out, err := mySynopsysCtl.Exec("deploy", "--cluster-scoped", "--enable-alert", "--enable-blackduck", "--enable-opssight", "-i=gcr.io/saas-hub-stg/blackducksoftware/synopsys-operator:release-2019.6.x")
 				if err != nil {
 					Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 				}
-				fmt.Printf("[DEBUG]: inside before suite, ran deploy command")
-				// End Setup
+				fmt.Printf("[DEBUG]: inside before suite, ran deploy command\n")
+				// END SETUP
 
-				// Begin Verification
-				fmt.Printf("[DEBUG]: inside of checking for pods")
+				// BEGIN VERIFICATION
+				fmt.Printf("[DEBUG]: inside of checking for pods\n")
 				label := labels.NewSelector()
 				r, _ := labels.NewRequirement("app", selection.Equals, []string{"synopsys-operator"})
 				label.Add(*r)
@@ -72,28 +73,29 @@ var _ = Describe("synopsysctl", func() {
 				if err != nil {
 					Fail(fmt.Sprintf("Operator pods failed to come up: %v", err))
 				}
-				fmt.Printf("[DEBUG]: done checking for pods")
+				fmt.Printf("[DEBUG]: done checking for pods\n")
 
-				fmt.Printf("[DEBUG]: checking for alert crd")
+				fmt.Printf("[DEBUG]: checking for alert crd\n")
 				err = crdutils.BlockUntilCrdIsAdded(apiExtensionClient, "alerts.synopsys.com", 10)
 				if err != nil {
 					Fail(fmt.Sprintf("alert crd was not added: %v", err))
 				}
 
-				fmt.Printf("[DEBUG]: checking for bd crd")
+				fmt.Printf("[DEBUG]: checking for bd crd\n")
 				err = crdutils.BlockUntilCrdIsAdded(apiExtensionClient, "blackducks.synopsys.com", 10)
 				if err != nil {
 					Fail(fmt.Sprintf("black duck crd was not added: %v", err))
 				}
 
-				fmt.Printf("[DEBUG]: checking for ops crd")
+				fmt.Printf("[DEBUG]: checking for ops crd\n")
 				err = crdutils.BlockUntilCrdIsAdded(apiExtensionClient, "opssights.synopsys.com", 10)
 				if err != nil {
 					Fail(fmt.Sprintf("opssight crd was not added: %v", err))
 				}
+				// END VERIFICATION
 
-				// Begin cleanup
-				fmt.Printf("[DEBUG]: cleaning up")
+				// BEGIN CLEANUP
+				fmt.Printf("[DEBUG]: cleaning up\n")
 				kc.CoreV1().Namespaces().Delete("synopsys-operator", &metav1.DeleteOptions{})
 				kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
 				kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
@@ -101,9 +103,12 @@ var _ = Describe("synopsysctl", func() {
 				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
 				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("opssights.synopsys.com", &metav1.DeleteOptions{})
 				//TODO:WAIT FOR NAMESPACE AND CRD TO BE DELETED
-				time.Sleep(10 * time.Second)
-				fmt.Printf("[DEBUG]: finished waiting for cluster cleanup")
-
+				err = namespaceutils.WaitForNamespacesDeleted(kc, []string{"synopsys-operator"}, time.Duration(30*time.Second))
+				if err != nil {
+					fmt.Printf("WAIT NS ERROR : %+v", err)
+				}
+				fmt.Printf("[DEBUG]: finished waiting for cluster cleanup\n")
+				// END CLEANUP
 			})
 
 			Specify("just alert crd can be enabled", func() {
@@ -124,7 +129,7 @@ var _ = Describe("synopsysctl", func() {
 
 		})
 
-		Context("deploying the operator in namespace scope", func() {
+		Context("deploying Synopsys Operator in namespace scope", func() {
 
 			Context("one namespace", func() {
 
@@ -152,7 +157,7 @@ var _ = Describe("synopsysctl", func() {
 			Context("multiple namespaces at the same time", func() {
 
 				Specify("one operator is deployed in 'alert' namespace with alert crd enabled, one operator is deployed in 'bd' namespace with blackduck crd enabled, and one operator is deployed in 'alert-and-bd' namespace with both alert and blackduck crd enabled", func() {
-					// Setup
+					// BEGIN SETUP
 					kc.CoreV1().Namespaces().Create(&corev1.Namespace{
 						ObjectMeta: metav1.ObjectMeta{
 							Namespace: "alert",
@@ -185,8 +190,9 @@ var _ = Describe("synopsysctl", func() {
 					if err != nil {
 						Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 					}
-					// End Setup
+					// END SETUP
 
+					// BEGIN VERIFICATION
 					label := labels.NewSelector()
 					r, _ := labels.NewRequirement("app", selection.Equals, []string{"synopsys-operator"})
 					label.Add(*r)
@@ -220,14 +226,30 @@ var _ = Describe("synopsysctl", func() {
 					if err != nil {
 						Fail(fmt.Sprintf("Operator pods failed to come up: %v", err))
 					}
+					// END VERIFICATION
 
-					// Cleanup
-					kc.CoreV1().Namespaces().Delete("alert", &metav1.DeleteOptions{})
-					apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
-					kc.CoreV1().Namespaces().Delete("bd", &metav1.DeleteOptions{})
-					apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
-					kc.CoreV1().Namespaces().Delete("alert-and-bd", &metav1.DeleteOptions{})
-
+					// BEGIN CLEANUP
+					cleanErrs := []error{}
+					err = kc.CoreV1().Namespaces().Delete("alert", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = kc.CoreV1().Namespaces().Delete("bd", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = kc.CoreV1().Namespaces().Delete("alert-and-bd", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+					cleanErrs = append(cleanErrs, err)
+					err = namespaceutils.WaitForNamespacesDeleted(kc, []string{"alert", "bd", "alert-and-bd"},time.Duration(30*time.Second))
+					cleanErrs = append(cleanErrs, err)
+					// if len(cleanErrs) != 0 {
+					// 	Fail(fmt.Sprintf("%+v", cleanErrs))
+					// }
+					// END CLEANUP
 				})
 				// create three namespaces
 				// execute three deploy commands
@@ -237,4 +259,91 @@ var _ = Describe("synopsysctl", func() {
 			})
 		})
 	})
+
+	Describe("destroy command", func() {
+		Context("destroying Synopsys Operator in cluster scope", func() {
+			Specify("all resources are removed", func() {
+				// BEGIN SETUP
+				out, err := mySynopsysCtl.Exec("deploy", "--cluster-scoped", "--enable-alert", "--enable-blackduck", "--enable-opssight", "-i=gcr.io/saas-hub-stg/blackducksoftware/synopsys-operator:release-2019.6.x")
+				if err != nil {
+					Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+				}
+				fmt.Printf("[DEBUG]: inside before suite, ran deploy command\n")
+				// END SETUP
+
+				// BEGIN VERIFICATION
+				out, err = mySynopsysCtl.Exec("destroy")
+				if err != nil {
+					Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+				}
+				label := labels.NewSelector()
+				r, _ := labels.NewRequirement("app", selection.Equals, []string{"synopsys-operator"})
+				label.Add(*r)
+				_, err = podutils.WaitForPodsWithLabelDeleted(kc, "synopsys-operator", label)
+				if err != nil {
+					Fail(fmt.Sprintf("Synopsys Operator pods failed to stop running: %v", err))
+				}
+				// TODO : check that CRDs are removed
+				// END VERIFICATION
+
+				// BEGIN CLEANUP
+				fmt.Printf("[DEBUG]: cleaning up\n")
+				kc.CoreV1().Namespaces().Delete("synopsys-operator", &metav1.DeleteOptions{})
+				kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+				kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("opssights.synopsys.com", &metav1.DeleteOptions{})
+				//TODO:WAIT FOR NAMESPACE AND CRD TO BE DELETED
+				namespaceutils.WaitForNamespacesDeleted(kc, []string{"synopsys-operator"}, time.Duration(30*time.Second))
+				fmt.Printf("[DEBUG]: finished waiting for cluster cleanup\n")
+				// END CLEANUP
+			})
+		})
+		Context("destroying Synopsys Operator in namespace scope", func() {
+			Specify("all resources are removed", func() {
+				// BEGIN SETUP
+				kc.CoreV1().Namespaces().Create(&corev1.Namespace{
+					ObjectMeta: metav1.ObjectMeta{
+						Namespace: "op-test",
+						Name:      "op-test",
+					},
+				})
+				out, err := mySynopsysCtl.Exec("deploy", "--enable-alert", "--enable-blackduck", "--namespace=op-test","-i=gcr.io/saas-hub-stg/blackducksoftware/synopsys-operator:release-2019.6.x")
+				if err != nil {
+					Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+				}
+				// END SETUP
+
+				// BEGIN VERIFICATION
+				out, err = mySynopsysCtl.Exec("destroy", "op-test")
+				if err != nil {
+					Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+				}
+				label := labels.NewSelector()
+				r, _ := labels.NewRequirement("app", selection.Equals, []string{"synopsys-operator"})
+				label.Add(*r)
+				_, err = podutils.WaitForPodsWithLabelDeleted(kc, "synopsys-operator", label)
+				if err != nil {
+					Fail(fmt.Sprintf("Synopsys Operator pods failed to stop running: %v", err))
+				}
+				// TODO : check that CRDs are removed
+				// END VERIFICATION
+
+				// BEGIN CLEANUP
+				fmt.Printf("[DEBUG]: cleaning up\n")
+				kc.CoreV1().Namespaces().Delete("op-test", &metav1.DeleteOptions{})
+				kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+				kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
+				apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("opssights.synopsys.com", &metav1.DeleteOptions{})
+				//TODO:WAIT FOR NAMESPACE AND CRD TO BE DELETED
+				namespaceutils.WaitForNamespacesDeleted(kc, []string{"op-test"}, time.Duration(30*time.Second)) 
+				fmt.Printf("[DEBUG]: finished waiting for cluster cleanup\n")
+				// END CLEANUP
+			})
+		})
+	})
+
 })
