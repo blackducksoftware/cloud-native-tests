@@ -8,6 +8,7 @@ import (
 
 	utils "github.com/blackducksoftware/cloud-native-tests/utils"
 	k8sutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper"
+	crutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/cr"
 	crdutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/crd"
 	namespaceutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/namespace"
 	podutils "github.com/blackducksoftware/cloud-native-tests/utils/k8shelper/pod"
@@ -467,6 +468,100 @@ var _ = Describe("synopsysctl", func() {
 				namespaceutils.WaitForNamespacesDeleted(kc, []string{"so-one"}, time.Duration(30*time.Second))
 				// END CLEANUP
 			})
+		})
+	})
+
+	Describe("create command", func() {
+		BeforeEach(func() {
+			fmt.Printf("Before Each: create command\n")
+		})
+		Context("creating Alert", func() {
+			BeforeEach(func() {
+				fmt.Printf("Before Each: creating Alert\n")
+			})
+			Context("in cluster scope", func() {
+				BeforeEach(func() {
+					fmt.Printf("Before Each: in vluster scope\n")
+				})
+				// deploy
+				// defer -> cleanup
+				Specify("the CR appears", func() {
+					// BEGIN SETUP
+					out, err := mySynopsysCtl.Exec("deploy", "--cluster-scoped", "--enable-alert", "-i=gcr.io/saas-hub-stg/blackducksoftware/synopsys-operator:release-2019.6.x")
+					if err != nil {
+						Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+					}
+					label := labels.NewSelector()
+					r, _ := labels.NewRequirement("app", selection.Equals, []string{"synopsys-operator"})
+					label.Add(*r)
+					_, err = podutils.WaitForPodsWithLabelRunningReady(kc, "synopsys-operator", label, 2, time.Duration(10*time.Second))
+					if err != nil {
+						Fail(fmt.Sprintf("Operator pods failed to come up: %v", err))
+					}
+					err = crdutils.BlockUntilCrdIsAdded(apiExtensionClient, "alerts.synopsys.com", 10)
+					if err != nil {
+						Fail(fmt.Sprintf("alert crd was not added: %v", err))
+					}
+					// END SETUP
+
+					// BEGIN VERIFICATION
+					out, err = mySynopsysCtl.Exec("create", "alert", "alt-one", "--standalone=false", "--persistent-storage=false")
+					if err != nil {
+						Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
+					}
+					good, err := crutils.AlertCRExists(kc.RESTClient(), "alt-one", "alt-one")
+					if err != nil {
+						Fail(fmt.Sprintf("bad get : %s", err))
+					}
+					if !good {
+						Fail(fmt.Sprintf("result : %v", good))
+					}
+					// END VERIFICATION
+
+					// BEGIN CLEANUP
+					kc.CoreV1().Namespaces().Delete("so-one", &metav1.DeleteOptions{})
+					kc.CoreV1().Namespaces().Delete("synopsys-operator", &metav1.DeleteOptions{})
+					kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+					kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+					apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
+					namespaceutils.WaitForNamespacesDeleted(kc, []string{"alt-one", "synopsys-operator"}, time.Duration(30*time.Second))
+					// END CLEANUP
+				})
+			})
+			Context("in namespaced scope", func() {
+				Specify("the CR appears", func() {})
+			})
+			Context("Native", func() {
+				Specify("resources can be deployed", func() {})
+			})
+		})
+		Context("creating Black Duck", func() {
+			Context("in cluster scope", func() {
+				Specify("the CR appears", func() {})
+			})
+			Context("in namespaced scope", func() {
+				Specify("the CR appears", func() {})
+			})
+			Context("Native", func() {
+				Specify("resources can be deployed", func() {})
+			})
+		})
+		Context("creating OpsSight", func() {
+			fmt.Printf("DEPLOYING\n")
+			Context("in cluster scope", func() {
+				Specify("the CR appears", func() {
+					fmt.Printf("TESTING\n")
+				})
+			})
+			Context("in namespaced scope", func() {
+				Specify("the CR appears", func() {})
+			})
+			Context("Native", func() {
+				Specify("resources can be deployed", func() {})
+			})
+			defer func() {
+				fmt.Printf("CLEANING\n")
+			}()
 		})
 	})
 
