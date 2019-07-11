@@ -22,20 +22,22 @@ under the License.
 package k8shelper
 
 import (
+	"encoding/json"
 	"flag"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/juju/errors"
 	log "github.com/sirupsen/logrus"
+	apierrs "k8s.io/apimachinery/pkg/api/errors"
+	utilnet "k8s.io/apimachinery/pkg/util/net"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" //for auths
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 	"k8s.io/client-go/util/homedir"
-	apierrs "k8s.io/apimachinery/pkg/api/errors"
-	utilnet "k8s.io/apimachinery/pkg/util/net"
 )
 
 // GetKubeConfig  will return the kube config
@@ -128,4 +130,29 @@ func IsRetryableAPIError(err error) bool {
 		return true
 	}
 	return false
+}
+
+// APIResponse ...
+type APIResponse struct {
+	APIVersion string      `json:"apiVersion"`
+	Kind       string      `json:"kind"`
+	Spec       interface{} `json:"spec,omitempty"`
+}
+
+
+/*
+GetResponseFromK8sEndpoint puts the data into the struct that is pointed to by unmarshal
+unmarshal - pointer to a struct
+*/
+func GetResponseFromK8sEndpoint(restcli rest.Interface, requesturi string, unmarshal interface{}) error {
+	b, err := restcli.Get().RequestURI(requesturi).DoRaw()
+	restcli.Get().Stream()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Response: %s\n", string(b))
+	if err := json.Unmarshal(b, unmarshal); err != nil {
+		return err
+	}
+	return nil
 }
