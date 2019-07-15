@@ -32,6 +32,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
 	utilnet "k8s.io/apimachinery/pkg/util/net"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth" //for auths
 	"k8s.io/client-go/rest"
@@ -112,6 +113,15 @@ func GetKubeClient(kubeConfig *rest.Config) (*kubernetes.Clientset, error) {
 	return client, nil
 }
 
+// GetDynamicClient gets a dynamic client
+func GetDynamicClient(config *rest.Config) (dynamic.Interface, error) {
+	client, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	return client, nil
+}
+
 // IntToInt64Ptr takes an int and returns a *int64
 func IntToInt64Ptr(i int) *int64 {
 	j := int64(i)
@@ -138,7 +148,6 @@ type APIResponse struct {
 	Kind       string      `json:"kind"`
 	Spec       interface{} `json:"spec,omitempty"`
 }
-
 
 /*
 GetResponseFromK8sEndpoint puts the data into the struct that is pointed to by unmarshal
