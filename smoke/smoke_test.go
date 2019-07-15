@@ -34,6 +34,7 @@ var _ = Describe("smoke", func() {
 
 	rc, _ := k8sutils.GetRestConfig()
 	kc, _ := k8sutils.GetKubeClient(rc)
+	dc, _ := k8sutils.GetDynamicClient(rc)
 
 	// get Crd
 	apiExtensionClient, err := apiextensionsclient.NewForConfig(rc)
@@ -80,40 +81,43 @@ var _ = Describe("smoke", func() {
 			if err != nil {
 				Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 			}
-			time.Sleep(5 * time.Second)
-			alertExists, err := crutils.AlertCRExists(kc.RESTClient(), "alt-one", "alt-one")
+			time.Sleep(1 * time.Second)
+			alertExists, err := dc.Resource(crutils.GetAlertSchema()).Namespace("alt-one").Get("alt-one", metav1.GetOptions{})
 			if err != nil {
 				Fail(fmt.Sprintf("bad get : %s", err))
 			}
-			if !alertExists {
+			if alertExists == nil {
 				Fail(fmt.Sprintf("Alert CR was not created : %v", alertExists))
 			}
+			By("Alert CR exists")
 			// Create a Black Duck
 			out, err = mySynopsysCtl.Exec("create", "blackduck", "bd-one", "--admin-password=blackduck", "--postgres-password=blackduck", "--user-password=blackduck")
 			if err != nil {
 				Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 			}
-			time.Sleep(5 * time.Second)
-			blackDuckExists, err := crutils.BlackDuckCRExists(kc.RESTClient(), "bd-one", "bd-one")
+			time.Sleep(1 * time.Second)
+			blackDuckExists, err := dc.Resource(crutils.GetBlackDuckSchema()).Namespace("bd-one").Get("bd-one", metav1.GetOptions{})
 			if err != nil {
 				Fail(fmt.Sprintf("bad get : %s", err))
 			}
-			if !blackDuckExists {
+			if blackDuckExists == nil {
 				Fail(fmt.Sprintf("Black Duck CR was not created : %v", blackDuckExists))
 			}
+			By("Black Duck CR exists")
 			// Create an OpsSight
 			out, err = mySynopsysCtl.Exec("create", "opssight", "ops-one")
 			if err != nil {
 				Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 			}
-			time.Sleep(5 * time.Second)
-			opsSightExists, err := crutils.OpsSightCRExists(kc.RESTClient(), "ops-one", "ops-one")
+			time.Sleep(1 * time.Second)
+			opsSightExists, err := dc.Resource(crutils.GetOpssightSchema()).Namespace("ops-one").Get("ops-one", metav1.GetOptions{})
 			if err != nil {
 				Fail(fmt.Sprintf("bad get : %s", err))
 			}
-			if !opsSightExists {
+			if opsSightExists == nil {
 				Fail(fmt.Sprintf("OpsSight CR was not created : %v", opsSightExists))
 			}
+			By("Opssight CR exists")
 			// Clean Up
 			// TODO : change to cleanup with synopsysctl
 			kc.CoreV1().Namespaces().Delete("synopsys-operator", &metav1.DeleteOptions{})
@@ -162,32 +166,32 @@ var _ = Describe("smoke", func() {
 			if err != nil {
 				Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 			}
-			time.Sleep(5 * time.Second)
-			alertExists, err := crutils.AlertCRExists(kc.RESTClient(), "so-test", "alt-one")
+			time.Sleep(1 * time.Second)
+			alertExists, err := dc.Resource(crutils.GetAlertSchema()).Namespace("so-test").Get("alt-one", metav1.GetOptions{})
 			if err != nil {
 				Fail(fmt.Sprintf("bad get : %s", err))
 			}
-			if !alertExists {
+			if alertExists == nil {
 				Fail(fmt.Sprintf("Alert CR was not created : %v", alertExists))
 			}
+			By("Alert CR exists")
 			// Create a Black Duck
 			out, err = mySynopsysCtl.Exec("create", "blackduck", "bd-one", "--namespace=so-test", "--admin-password=blackduck", "--postgres-password=blackduck", "--user-password=blackduck")
 			if err != nil {
 				Fail(fmt.Sprintf("Out: %s Error: %v", out, err))
 			}
-			time.Sleep(5 * time.Second)
-			blackDuckExists, err := crutils.BlackDuckCRExists(kc.RESTClient(), "so-test", "bd-one")
+			time.Sleep(1 * time.Second)
+			blackDuckExists, err := dc.Resource(crutils.GetBlackDuckSchema()).Namespace("so-test").Get("bd-one", metav1.GetOptions{})
 			if err != nil {
 				Fail(fmt.Sprintf("bad get : %s", err))
 			}
-			if !blackDuckExists {
+			if blackDuckExists == nil {
 				Fail(fmt.Sprintf("Black Duck CR was not created : %v", blackDuckExists))
 			}
+			By("Black Duck CR exists")
 			// Clean Up
 			// TODO : change to cleanup with synopsysctl
-			kc.CoreV1().Namespaces().Delete("synopsys-operator", &metav1.DeleteOptions{})
-			kc.RbacV1().ClusterRoles().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
-			kc.RbacV1().ClusterRoleBindings().Delete("synopsys-operator-admin", &metav1.DeleteOptions{})
+			kc.CoreV1().Namespaces().Delete("so-test", &metav1.DeleteOptions{})
 			apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("alerts.synopsys.com", &metav1.DeleteOptions{})
 			apiExtensionClient.ApiextensionsV1beta1().CustomResourceDefinitions().Delete("blackducks.synopsys.com", &metav1.DeleteOptions{})
 			namespaceutils.WaitForNamespacesDeleted(kc, []string{"so-test"}, time.Duration(30*time.Second))
